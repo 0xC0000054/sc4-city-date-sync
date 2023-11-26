@@ -24,6 +24,7 @@ I missed.
 
 1. Close SimCity 4.
 2. Copy `SC4CityDateSync.dll` and `SC4CityDateSync.ini` into the Plugins folder in the SimCity 4 installation directory.
+3. Start SimCity 4.
 
 ## Troubleshooting
 
