@@ -242,7 +242,7 @@ public:
 	{
 		cISC4City* pCity = reinterpret_cast<cISC4City*>(pStandardMsg->GetIGZUnknown());
 
-		if (pCity)
+		if (pCity && pCity->GetEstablished())
 		{
 			cISC4Simulator* pSimulator = pCity->GetSimulator();
 
