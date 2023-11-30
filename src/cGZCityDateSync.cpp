@@ -257,6 +257,10 @@ public:
 								WriteLogEntry("The city has a more recent date than the previous city.");
 							}
 						}
+						else
+						{
+							WriteLogEntry("Unable to check the date because the date pointer was null.");
+						}
 						simDateSet = false;
 					}
 					else
@@ -266,9 +270,17 @@ public:
 				}
 				else
 				{
-					WriteLogEntry("The city has not been established, once it is established the date may be changed the next time it is loaded.");
+					WriteLogEntry("Unable to check the date because the simulator pointer was null.");
 				}
 			}
+			else
+			{
+				WriteLogEntry("The city has not been established, once it is established the date may be changed the next time it is loaded.");
+			}
+		}
+		else
+		{
+			WriteLogEntry("Unable to check the date because the city pointer was null.");
 		}
 	}
 
@@ -276,31 +288,51 @@ public:
 	{
 		cISC4City* pCity = reinterpret_cast<cISC4City*>(pStandardMsg->GetIGZUnknown());
 
-		if (pCity && pCity->GetEstablished())
+		if (pCity)
 		{
-			cISC4Simulator* pSimulator = pCity->GetSimulator();
-
-			if (pSimulator)
+			if (pCity->GetEstablished())
 			{
-				cIGZDate* simDate = pSimulator->GetSimDate();
+				cISC4Simulator* pSimulator = pCity->GetSimulator();
 
-				if (simDate)
+				if (pSimulator)
 				{
-					currentSimDate.month = simDate->Month();
-					currentSimDate.day = simDate->DayOfMonth();
-					currentSimDate.year = simDate->Year();
-					currentSimDate.dateNumber = simDate->DayNumber();
+					cIGZDate* simDate = pSimulator->GetSimDate();
 
-					simDateSet = true;
+					if (simDate)
+					{
+						currentSimDate.month = simDate->Month();
+						currentSimDate.day = simDate->DayOfMonth();
+						currentSimDate.year = simDate->Year();
+						currentSimDate.dateNumber = simDate->DayNumber();
 
-					WriteLogEntryFormattedInvariant(
-						"Saved the current city date: %u %u %4u.",
-						currentSimDate.month,
-						currentSimDate.day,
-						currentSimDate.year);
+						simDateSet = true;
+
+						WriteLogEntryFormattedInvariant(
+							"Saved the current city date: %u %u %4u.",
+							currentSimDate.month,
+							currentSimDate.day,
+							currentSimDate.year);
+					}
+					else
+					{
+						WriteLogEntry("Ignoring the date because the city date pointer was null.");
+					}
+				}
+				else
+				{
+					WriteLogEntry("Ignoring the date because the simulator pointer was null.");
 				}
 			}
+			else
+			{
+				WriteLogEntry("Ignoring the date because the city has not been established.");
+			}
 		}
+		else
+		{
+			WriteLogEntry("Ignoring the date because the city pointer was null.");
+		}
+
 		exitingCity = true;
 	}
 
