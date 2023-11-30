@@ -101,6 +101,32 @@ public:
 		return result;
 	}
 
+	void WriteLogEntryFormattedInvariant(const char* format, ...)
+	{
+		va_list args;
+		va_start(args, format);
+
+		va_list argsCopy;
+		va_copy(argsCopy, args);
+
+		int formattedStringLength = _vscprintf_l(format, cLocale, argsCopy);
+
+		va_end(argsCopy);
+
+		if (formattedStringLength > 0)
+		{
+			size_t formattedStringLengthWithNull = static_cast<size_t>(formattedStringLength) + 1;
+
+			std::unique_ptr<char[]> buffer = std::make_unique_for_overwrite<char[]>(formattedStringLengthWithNull);
+
+			_vsnprintf_s_l(buffer.get(), formattedStringLengthWithNull, _TRUNCATE, format, cLocale, args);
+
+			WriteLogEntry(buffer.get());
+		}
+
+		va_end(args);
+	}
+
 	void WriteLogEntry(const char* line)
 	{
 		if (logFile && line)
@@ -108,10 +134,9 @@ public:
 			SYSTEMTIME time;
 			GetLocalTime(&time);
 
-			char buffer[1024]{};
-
-			std::snprintf(buffer,
-				sizeof(buffer),
+			int formattedStringLength = std::snprintf(
+				nullptr,
+				0,
 				"[%hu:%hu:%hu.%hu] %s",
 				time.wHour,
 				time.wMinute,
@@ -119,11 +144,28 @@ public:
 				time.wMilliseconds,
 				line);
 
+			if (formattedStringLength > 0)
+			{
+				size_t formattedStringLengthWithNull = static_cast<size_t>(formattedStringLength) + 1;
+
+				std::unique_ptr<char[]> buffer = std::make_unique_for_overwrite<char[]>(formattedStringLengthWithNull);
+
+				std::snprintf(
+					buffer.get(),
+					formattedStringLengthWithNull,
+					"[%hu:%hu:%hu.%hu] %s",
+					time.wHour,
+					time.wMinute,
+					time.wSecond,
+					time.wMilliseconds,
+					line);
+
 #ifdef _DEBUG
-			PrintLineToDebugOutput(buffer);
+				PrintLineToDebugOutput(buffer.get());
 #endif // _DEBUG
 
-			logFile << buffer << std::endl;
+				logFile << buffer.get() << std::endl;
+			}
 		}
 	}
 
@@ -194,22 +236,14 @@ public:
 												cRZBaseString(simDateCommandBuffer),
 												kSC4CheatGUIDSimDate);
 
-											char logBuffer[1024]{};
-
-											_snprintf_s_l(
-												logBuffer,
-												sizeof(logBuffer),
-												_TRUNCATE,
+											WriteLogEntryFormattedInvariant(
 												"Changed the city date from %u %u %4u to %u %u %4u.",
-												cLocale,
 												oldCityMonth,
 												oldCityDayOfMonth,
 												oldCityYear,
 												currentSimDate.month,
 												currentSimDate.day,
 												currentSimDate.year);
-
-											WriteLogEntry(logBuffer);
 										}
 										else
 										{
@@ -258,6 +292,12 @@ public:
 					currentSimDate.dateNumber = simDate->DayNumber();
 
 					simDateSet = true;
+
+					WriteLogEntryFormattedInvariant(
+						"Saved the current city date: %u %u %4u.",
+						currentSimDate.month,
+						currentSimDate.day,
+						currentSimDate.year);
 				}
 			}
 		}
