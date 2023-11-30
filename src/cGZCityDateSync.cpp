@@ -106,7 +106,7 @@ public:
 		if (logFile && line)
 		{
 			SYSTEMTIME time;
-			GetSystemTime(&time);
+			GetLocalTime(&time);
 
 			char buffer[1024]{};
 
