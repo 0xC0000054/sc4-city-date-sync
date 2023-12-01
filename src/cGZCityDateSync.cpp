@@ -51,8 +51,7 @@ class cGZCityDateSyncDllDirector : public cRZMessage2COMDirector
 public:
 
 	cGZCityDateSyncDllDirector()
-		: currentSimDate(),
-		  simDateSet(false),
+		: currentSimDate(nullptr),
 		  exitingCity(false)
 	{
 		std::filesystem::path dllFolder = GetDllFolderPath();
@@ -71,34 +70,6 @@ public:
 	uint32_t GetDirectorID() const
 	{
 		return kCityDateSyncPluginDirectorID;
-	}
-
-	bool ShouldChangeCityDate(cIGZDate& cityDate) const
-	{
-		bool result = false;
-
-		const uint32_t cityYear = cityDate.Year();
-
-		if (cityYear < currentSimDate.year)
-		{
-			result = true;
-		}
-		else if (cityYear == currentSimDate.year)
-		{
-			const uint32_t cityMonth = cityDate.Month();
-
-			if (cityMonth < currentSimDate.month)
-			{
-				result = true;
-			}
-			else if (cityMonth == currentSimDate.month)
-			{
-				const uint32_t dayOfMonth = cityDate.DayOfMonth();
-				result = dayOfMonth < currentSimDate.day;
-			}
-		}
-
-		return result;
 	}
 
 	void WriteLogEntryFormattedInvariant(const char* format, ...)
@@ -181,13 +152,13 @@ public:
 
 				if (pSimulator)
 				{
-					if (simDateSet)
+					if (currentSimDate)
 					{
 						cIGZDate* cityDate = pSimulator->GetSimDate();
 
 						if (cityDate)
 						{
-							if (ShouldChangeCityDate(*cityDate))
+							if (*cityDate < *currentSimDate)
 							{
 								cISC4AppPtr pSc4App;
 
@@ -197,57 +168,59 @@ public:
 
 									if (pCheatCodeManager)
 									{
-										char simDateCommandBuffer[1024]{};
-
-										// The SimDate command supports a single argument value that is formatted in its
-										// internal date representation.
-										// We use the single argument version to work around a bug in the 3 argument
-										// (MM DD YYYY) version.
-										// 
-										// The 3 argument (MM DD YYYY) command sets the calendar date to the next day after
-										// the date you enter, so you have to subtract one day from your selected value when
-										// using it.
-										// For example, to set the simulator date to 1/1/2000 you would have to enter the
-										// command: SimDate 12 31 1999.
-										//
-										// We print the number using the "C" locale, this ensures that the number will
-										// always be printed the same way regardless of the global locale settings that
-										// are in use.
-										int charsWritten = _snprintf_s_l(
-											simDateCommandBuffer,
-											sizeof(simDateCommandBuffer),
-											_TRUNCATE,
-											"SimDate %u",
-											cLocale,
-											currentSimDate.dateNumber);
-
-										if (charsWritten > 0)
+										cIGZDate* previousDay = nullptr;
+										if (currentSimDate->Clone(&previousDay))
 										{
-											// Cache the old city date in local variables for logging purposes.
-											// Because the cityDate variable is a pointer to an internal game structure its
-											// date value will always be the current simulator date at the time its methods
-											// are called, and this isn't what we want.
-											uint32_t oldCityMonth = cityDate->Month();
-											uint32_t oldCityDayOfMonth = cityDate->DayOfMonth();
-											uint32_t oldCityYear = cityDate->Year();
+											// SimDate MM DD YYYY sets the calendar date to the next day after the date
+											// you enter, so you have to subtract one day from your selected value when
+											// using it.
+											// For example, to set the simulator date to 1/1/2000 you would have to enter the
+											// command: SimDate 12 31 1999.
+											*previousDay -= 1;
 
-											// SendCheatNotifications always returns false.
-											pCheatCodeManager->SendCheatNotifications(
-												cRZBaseString(simDateCommandBuffer),
-												kSC4CheatGUIDSimDate);
+											char simDateCommandBuffer[1024]{};
 
-											WriteLogEntryFormattedInvariant(
-												"Changed the city date from %u %u %4u to %u %u %4u.",
-												oldCityMonth,
-												oldCityDayOfMonth,
-												oldCityYear,
-												currentSimDate.month,
-												currentSimDate.day,
-												currentSimDate.year);
-										}
-										else
-										{
-											WriteLogEntry("Failed to create the SimDate cheat command.");
+											// We print the number using the "C" locale, this ensures that the number will
+											// always be printed the same way regardless of the global locale settings that
+											// are in use.
+											int charsWritten = _snprintf_s_l(
+												simDateCommandBuffer,
+												sizeof(simDateCommandBuffer),
+												_TRUNCATE,
+												"SimDate %u %u %4u",
+												cLocale,
+												previousDay->Month(),
+												previousDay->DayOfMonth(),
+												previousDay->Year());
+
+											if (charsWritten > 0)
+											{
+												// Cache the old city date in local variables for logging purposes.
+												// Because the cityDate variable is a pointer to an internal game structure its
+												// date value will always be the current simulator date at the time its methods
+												// are called, and this isn't what we want.
+												uint32_t oldCityMonth = cityDate->Month();
+												uint32_t oldCityDayOfMonth = cityDate->DayOfMonth();
+												uint32_t oldCityYear = cityDate->Year();
+
+												// SendCheatNotifications always returns false.
+												pCheatCodeManager->SendCheatNotifications(
+													cRZBaseString(simDateCommandBuffer),
+													kSC4CheatGUIDSimDate);
+
+												WriteLogEntryFormattedInvariant(
+													"Changed the city date from %u %u %4u to %u %u %4u.",
+													oldCityMonth,
+													oldCityDayOfMonth,
+													oldCityYear,
+													currentSimDate->Month(),
+													currentSimDate->DayOfMonth(),
+													currentSimDate->Year());
+											}
+											else
+											{
+												WriteLogEntry("Failed to create the SimDate cheat command.");
+											}
 										}
 									}
 								}
@@ -261,7 +234,7 @@ public:
 						{
 							WriteLogEntry("Unable to check the date because the date pointer was null.");
 						}
-						simDateSet = false;
+						currentSimDate = nullptr;
 					}
 					else
 					{
@@ -300,18 +273,18 @@ public:
 
 					if (simDate)
 					{
-						currentSimDate.month = simDate->Month();
-						currentSimDate.day = simDate->DayOfMonth();
-						currentSimDate.year = simDate->Year();
-						currentSimDate.dateNumber = simDate->DayNumber();
-
-						simDateSet = true;
-
-						WriteLogEntryFormattedInvariant(
-							"Saved the current city date: %u %u %4u.",
-							currentSimDate.month,
-							currentSimDate.day,
-							currentSimDate.year);
+						if (simDate->Clone(&currentSimDate))
+						{
+							WriteLogEntryFormattedInvariant(
+								"Saved the current city date: %u %u %4u.",
+								currentSimDate->Month(),
+								currentSimDate->DayOfMonth(),
+								currentSimDate->Year());
+						}
+						else
+						{
+							WriteLogEntry("Failed to copy the current city date.");
+						}
 					}
 					else
 					{
@@ -348,7 +321,7 @@ public:
 		}
 
 		// The city dates are not synchronized across regions.
-		simDateSet = false;
+		currentSimDate = nullptr;
 	}
 
 	bool DoMessage(cIGZMessage2* pMessage)
@@ -470,20 +443,7 @@ private:
 	}
 #endif // _DEBUG
 
-	struct Date
-	{
-		Date() : month(0), day(0), year(0), dateNumber(0)
-		{
-		}
-
-		uint32_t month;
-		uint32_t day;
-		uint32_t year;
-		uint32_t dateNumber;
-	};
-
-	Date currentSimDate;
-	bool simDateSet;
+	cIGZDate* currentSimDate;
 	bool exitingCity;
 	_locale_t cLocale;
 	std::ofstream logFile;
