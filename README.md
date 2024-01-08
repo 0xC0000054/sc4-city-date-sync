@@ -2,7 +2,7 @@
 
 A DLL Plugin for SimCity 4 that synchronizes the city dates in a region.   
 
-The plugin saves the current in-game date when exiting an established city, and then applies
+The plugin stores the current in-game date when saving an established city, and then applies
 it to the next established city if that city's in-game date is less then the stored value.
 The city date is applied by automatically executing the SimDate cheat when loading the city.
 The city date synchronization only occurs between cities located in the same region.

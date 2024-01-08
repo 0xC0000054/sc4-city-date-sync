@@ -37,6 +37,7 @@
 
 static constexpr uint32_t kSC4MessagePostCityInit = 0x26D31EC1;
 static constexpr uint32_t kSC4MessagePreCityShutdown = 0x26D31EC2;
+static constexpr uint32_t kSC4MessagePostSave = 0x26C63345;
 static constexpr uint32_t kSC4MessagePostRegionInit = 0xCBB5BB45;
 
 static constexpr uint32_t kCityDateSyncPluginDirectorID = 0x9f234be4;
@@ -257,55 +258,67 @@ public:
 		}
 	}
 
-	void PreCityShutdown(cIGZMessage2Standard* pStandardMsg)
+	void PostCitySave()
 	{
-		cISC4City* pCity = reinterpret_cast<cISC4City*>(pStandardMsg->GetIGZUnknown());
+		cISC4AppPtr pSC4App;
 
-		if (pCity)
+		if (pSC4App)
 		{
-			if (pCity->GetEstablished())
+			cISC4City* pCity = pSC4App->GetCity();
+
+			if (pCity)
 			{
-				cISC4Simulator* pSimulator = pCity->GetSimulator();
-
-				if (pSimulator)
+				if (pCity->GetEstablished())
 				{
-					cIGZDate* simDate = pSimulator->GetSimDate();
+					cISC4Simulator* pSimulator = pCity->GetSimulator();
 
-					if (simDate)
+					if (pSimulator)
 					{
-						if (simDate->Clone(&currentSimDate))
+						cIGZDate* simDate = pSimulator->GetSimDate();
+
+						if (simDate)
 						{
-							WriteLogEntryFormattedInvariant(
-								"Saved the current city date: %u %u %4u.",
-								currentSimDate->Month(),
-								currentSimDate->DayOfMonth(),
-								currentSimDate->Year());
+							if (simDate->Clone(&currentSimDate))
+							{
+								WriteLogEntryFormattedInvariant(
+									"Saved the current city date: %u %u %4u.",
+									currentSimDate->Month(),
+									currentSimDate->DayOfMonth(),
+									currentSimDate->Year());
+							}
+							else
+							{
+								WriteLogEntry("Failed to copy the current city date.");
+							}
 						}
 						else
 						{
-							WriteLogEntry("Failed to copy the current city date.");
+							WriteLogEntry("Ignoring the date because the city date pointer was null.");
 						}
 					}
 					else
 					{
-						WriteLogEntry("Ignoring the date because the city date pointer was null.");
+						WriteLogEntry("Ignoring the date because the simulator pointer was null.");
 					}
 				}
 				else
 				{
-					WriteLogEntry("Ignoring the date because the simulator pointer was null.");
+					WriteLogEntry("Ignoring the date because the city has not been established.");
 				}
 			}
 			else
 			{
-				WriteLogEntry("Ignoring the date because the city has not been established.");
+				WriteLogEntry("Ignoring the date because the city pointer was null.");
 			}
 		}
 		else
 		{
-			WriteLogEntry("Ignoring the date because the city pointer was null.");
+			WriteLogEntry("Ignoring the date because the cISC4App pointer was null.");
 		}
+	}
 
+	void PreCityShutdown(cIGZMessage2Standard* pStandardMsg)
+	{
 		exitingCity = true;
 	}
 
@@ -336,6 +349,9 @@ public:
 			break;
 		case kSC4MessagePreCityShutdown:
 			PreCityShutdown(pStandardMsg);
+			break;
+		case kSC4MessagePostSave:
+			PostCitySave();
 			break;
 		case kSC4MessagePostRegionInit:
 			PostRegionInit();
@@ -377,6 +393,7 @@ public:
 			std::vector<uint32_t> requiredNotifications;
 			requiredNotifications.push_back(kSC4MessagePostCityInit);
 			requiredNotifications.push_back(kSC4MessagePreCityShutdown);
+			requiredNotifications.push_back(kSC4MessagePostSave);
 			requiredNotifications.push_back(kSC4MessagePostRegionInit);
 
 			for (uint32_t messageID : requiredNotifications)
