@@ -103,17 +103,20 @@ public:
 	{
 		if (logFile && line)
 		{
-			SYSTEMTIME time;
-			GetLocalTime(&time);
+			char timeBuffer[256]{};
+			GetTimeFormatA(
+				LOCALE_USER_DEFAULT,
+				0,
+				nullptr,
+				nullptr,
+				timeBuffer,
+				_countof(timeBuffer));
 
 			int formattedStringLength = std::snprintf(
 				nullptr,
 				0,
-				"[%hu:%hu:%hu.%hu] %s",
-				time.wHour,
-				time.wMinute,
-				time.wSecond,
-				time.wMilliseconds,
+				"%s %s",
+				timeBuffer,
 				line);
 
 			if (formattedStringLength > 0)
@@ -125,11 +128,8 @@ public:
 				std::snprintf(
 					buffer.get(),
 					formattedStringLengthWithNull,
-					"[%hu:%hu:%hu.%hu] %s",
-					time.wHour,
-					time.wMinute,
-					time.wSecond,
-					time.wMilliseconds,
+					"%s %s",
+					timeBuffer,
 					line);
 
 #ifdef _DEBUG
