@@ -161,11 +161,11 @@ public:
 						{
 							if (*cityDate < *currentSimDate)
 							{
-								cISC4AppPtr pSc4App;
+								cISC4AppPtr pSC4App;
 
-								if (pSc4App)
+								if (pSC4App)
 								{
-									cIGZCheatCodeManager* pCheatCodeManager = pSc4App->GetCheatCodeManager();
+									cIGZCheatCodeManager* pCheatCodeManager = pSC4App->GetCheatCodeManager();
 
 									if (pCheatCodeManager)
 									{
